@@ -57,6 +57,20 @@ accent surfaces, pill controls, and a dark floating bottom navigation.
 
 See `docs/design-direction.md` for the evolving UI direction.
 
+## Preview App
+
+Dafta now includes a static React preview designed for GitHub Pages. It supports
+interactive tabs for Today, Inbox, Notes, Projects, and Memory, plus a quick
+capture flow that detects simple reminder-like entries.
+
+```bash
+npm install
+npm run dev
+```
+
+The GitHub Pages workflow builds the preview into `dist-pages` whenever changes
+are pushed to `main`.
+
 ## Initial Roadmap
 
 1. Define brand, UI direction, and interaction model.

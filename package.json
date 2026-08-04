@@ -6,10 +6,12 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "dev": "vite --config vite.pages.config.ts --host 0.0.0.0",
+    "build": "tsc -p tsconfig.pages.json && vite build --config vite.pages.config.ts",
+    "preview": "vite preview --config vite.pages.config.ts --host 0.0.0.0",
+    "build:sites": "vinext build",
+    "start:sites": "vinext start",
+    "test": "npm run build",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
