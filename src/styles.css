@@ -337,7 +337,9 @@ h1 {
   padding: 18px;
 }
 
-.quick-capture input {
+.quick-capture input,
+.quick-capture select,
+.quick-capture textarea {
   background: rgba(255, 255, 255, 0.62);
   border: 0;
   border-radius: 18px;
@@ -349,6 +351,10 @@ h1 {
   width: 100%;
 }
 
+.quick-capture textarea {
+  resize: vertical;
+}
+
 .quick-capture button,
 .reminder-card button {
   background: rgba(255, 255, 255, 0.72);
@@ -358,6 +364,30 @@ h1 {
   font-weight: 850;
   padding: 13px 16px;
   white-space: nowrap;
+}
+
+.details-toggle {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.capture-details {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr 1fr;
+}
+
+.capture-details label {
+  color: rgba(17, 19, 24, 0.72);
+  display: grid;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 6px;
+}
+
+.capture-details .wide-field {
+  grid-column: 1 / -1;
 }
 
 .screen-stack,

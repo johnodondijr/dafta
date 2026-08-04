@@ -26,6 +26,7 @@ type EntryDraft = {
   tag: string;
   person: string;
   project: string;
+  date: string;
 };
 
 const storageKey = "dafta.entries.v1";
@@ -119,6 +120,7 @@ function makeEmptyDraft(kind: EntryKind = "note"): EntryDraft {
     tag: kind === "reminder" ? "Reminder" : "Note",
     person: "",
     project: "",
+    date: "2026-08-04",
   };
 }
 
@@ -143,6 +145,7 @@ function parseCapture(text: string): EntryDraft {
     tag: projectMatch?.[1] ?? (reminderMatch ? "Detected" : "Inbox"),
     person: personMatch?.[1] ?? "",
     project: projectMatch?.[1] ? titleCase(projectMatch[1]) : "",
+    date: "2026-08-04",
   };
 }
 
@@ -169,6 +172,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("Today");
   const [entries, setEntries] = useState<Entry[]>(loadEntries);
   const [draft, setDraft] = useState("");
+  const [captureDetailsOpen, setCaptureDetailsOpen] = useState(false);
+  const [captureDraft, setCaptureDraft] = useState<EntryDraft>(() => ({
+    ...makeEmptyDraft("note"),
+    date: "2026-08-04",
+  }));
   const [query, setQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState("2026-08-04");
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
@@ -177,6 +185,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(storageKey, JSON.stringify(entries));
   }, [entries]);
+
+  useEffect(() => {
+    setCaptureDraft((current) => ({ ...current, date: selectedDate }));
+  }, [selectedDate]);
 
   const filteredEntries = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -226,20 +238,35 @@ export default function App() {
     }
 
     const parsed = parseCapture(text);
+    const kind =
+      captureDraft.kind === "reminder" || parsed.kind === "reminder"
+        ? "reminder"
+        : "note";
     const now = new Date().toISOString();
     const nextEntry: Entry = {
       id: Date.now(),
-      ...parsed,
+      kind,
+      title: parsed.title,
+      body: captureDraft.body.trim() || parsed.body,
+      time:
+        kind === "reminder"
+          ? captureDraft.time.trim() || parsed.time || "Soon"
+          : undefined,
+      tag: captureDraft.tag.trim() || parsed.tag,
+      person: captureDraft.person.trim() || parsed.person || undefined,
+      project: captureDraft.project.trim() || parsed.project || undefined,
       createdAt: now,
       updatedAt: now,
-      person: parsed.person || undefined,
-      project: parsed.project || undefined,
-      time: parsed.time || undefined,
-      date: selectedDate,
+      date: captureDraft.date || selectedDate,
     };
 
     setEntries((current) => [nextEntry, ...current]);
     setDraft("");
+    setCaptureDraft((current) => ({
+      ...makeEmptyDraft(current.kind),
+      date: selectedDate,
+    }));
+    setCaptureDetailsOpen(false);
     setSelectedEntry(nextEntry);
     setEditorDraft(entryToDraft(nextEntry));
     setActiveTab("Inbox");
@@ -267,7 +294,7 @@ export default function App() {
       person: editorDraft.person.trim() || undefined,
       project: editorDraft.project.trim() || undefined,
       updatedAt: new Date().toISOString(),
-      date: selectedEntry.date ?? selectedDate,
+      date: editorDraft.date || selectedEntry.date || selectedDate,
     };
 
     setEntries((current) =>
@@ -300,6 +327,7 @@ export default function App() {
     setSelectedEntry(null);
     setQuery("");
     setSelectedDate("2026-08-04");
+    setCaptureDraft({ ...makeEmptyDraft("note"), date: "2026-08-04" });
   }
 
   function openCalendarForDate(dateKey: string) {
@@ -382,7 +410,16 @@ export default function App() {
               View full calendar
             </button>
 
-            <CaptureForm draft={draft} setDraft={setDraft} onSubmit={addEntry} />
+            <CaptureForm
+              captureDetailsOpen={captureDetailsOpen}
+              draft={draft}
+              entryDraft={captureDraft}
+              selectedDate={selectedDate}
+              setCaptureDetailsOpen={setCaptureDetailsOpen}
+              setDraft={setDraft}
+              setEntryDraft={setCaptureDraft}
+              onSubmit={addEntry}
+            />
             <ReminderList
               reminders={selectedDateReminders}
               openEditor={openEditor}
@@ -393,7 +430,16 @@ export default function App() {
 
         {activeTab === "Inbox" && (
           <section className="screen-stack">
-            <CaptureForm draft={draft} setDraft={setDraft} onSubmit={addEntry} />
+            <CaptureForm
+              captureDetailsOpen={captureDetailsOpen}
+              draft={draft}
+              entryDraft={captureDraft}
+              selectedDate={selectedDate}
+              setCaptureDetailsOpen={setCaptureDetailsOpen}
+              setDraft={setDraft}
+              setEntryDraft={setCaptureDraft}
+              onSubmit={addEntry}
+            />
             <SectionTitle title="Captured" action={`${filteredEntries.length} items`} />
             {filteredEntries.map((entry, index) => (
               <EntryCard
@@ -466,6 +512,16 @@ export default function App() {
             <SectionTitle
               title="This day"
               action={`${selectedDateEntries.length} items`}
+            />
+            <CaptureForm
+              captureDetailsOpen={captureDetailsOpen}
+              draft={draft}
+              entryDraft={{ ...captureDraft, date: selectedDate }}
+              selectedDate={selectedDate}
+              setCaptureDetailsOpen={setCaptureDetailsOpen}
+              setDraft={setDraft}
+              setEntryDraft={setCaptureDraft}
+              onSubmit={addEntry}
             />
             {selectedDateEntries.map((entry, index) => (
               <EntryCard
@@ -586,22 +642,33 @@ function entryToDraft(entry: Entry): EntryDraft {
     tag: entry.tag,
     person: entry.person ?? "",
     project: entry.project ?? "",
+    date: entry.date ?? "2026-08-04",
   };
 }
 
 function CaptureForm({
+  captureDetailsOpen,
   draft,
+  entryDraft,
+  selectedDate,
+  setCaptureDetailsOpen,
   setDraft,
+  setEntryDraft,
   onSubmit,
 }: {
+  captureDetailsOpen: boolean;
   draft: string;
+  entryDraft: EntryDraft;
+  selectedDate: string;
+  setCaptureDetailsOpen: (value: boolean) => void;
   setDraft: (value: string) => void;
+  setEntryDraft: (draft: EntryDraft) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <form className="quick-capture" onSubmit={onSubmit}>
       <label>
-        <span className="eyebrow">Quick capture</span>
+        <span className="eyebrow">Quick capture for {formatDateLabel(selectedDate)}</span>
         <input
           aria-label="Quick capture"
           onChange={(event) => setDraft(event.target.value)}
@@ -610,6 +677,98 @@ function CaptureForm({
         />
       </label>
       <button>Add</button>
+      <button
+        className="details-toggle"
+        type="button"
+        onClick={() => setCaptureDetailsOpen(!captureDetailsOpen)}
+      >
+        {captureDetailsOpen ? "Hide details" : "Add details"}
+      </button>
+      {captureDetailsOpen && (
+        <div className="capture-details">
+          <label>
+            Type
+            <select
+              value={entryDraft.kind}
+              onChange={(event) =>
+                setEntryDraft({
+                  ...entryDraft,
+                  kind: event.target.value as EntryKind,
+                })
+              }
+            >
+              <option value="note">Note</option>
+              <option value="reminder">Reminder</option>
+            </select>
+          </label>
+          <label>
+            Date
+            <select
+              value={entryDraft.date || selectedDate}
+              onChange={(event) =>
+                setEntryDraft({ ...entryDraft, date: event.target.value })
+              }
+            >
+              {monthDays.map(({ day, label, key }) => (
+                <option key={key} value={key}>
+                  {day} {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Time
+            <input
+              placeholder="09:30"
+              value={entryDraft.time}
+              onChange={(event) =>
+                setEntryDraft({ ...entryDraft, time: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Person
+            <input
+              placeholder="Amina"
+              value={entryDraft.person}
+              onChange={(event) =>
+                setEntryDraft({ ...entryDraft, person: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Project
+            <input
+              placeholder="Dafta v1"
+              value={entryDraft.project}
+              onChange={(event) =>
+                setEntryDraft({ ...entryDraft, project: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Tag
+            <input
+              placeholder="Follow-up"
+              value={entryDraft.tag}
+              onChange={(event) =>
+                setEntryDraft({ ...entryDraft, tag: event.target.value })
+              }
+            />
+          </label>
+          <label className="wide-field">
+            Details
+            <textarea
+              rows={3}
+              placeholder="Anything useful to remember..."
+              value={entryDraft.body}
+              onChange={(event) =>
+                setEntryDraft({ ...entryDraft, body: event.target.value })
+              }
+            />
+          </label>
+        </div>
+      )}
     </form>
   );
 }
