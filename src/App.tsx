@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-type Tab = "Today" | "Inbox" | "Notes" | "Projects" | "Memory";
+type Tab = "Today" | "Inbox" | "Notes" | "Calendar" | "Projects" | "Memory";
 type EntryKind = "note" | "reminder";
 
 type Entry = {
@@ -15,6 +15,7 @@ type Entry = {
   updatedAt: string;
   person?: string;
   project?: string;
+  date?: string;
 };
 
 type EntryDraft = {
@@ -39,6 +40,7 @@ const seedEntries: Entry[] = [
     tag: "Follow-up",
     person: "Amina",
     project: "Dafta v1",
+    date: "2026-08-04",
     createdAt: "2026-08-04T09:00:00.000Z",
     updatedAt: "2026-08-04T09:00:00.000Z",
   },
@@ -50,6 +52,7 @@ const seedEntries: Entry[] = [
     time: "12:00",
     tag: "Design",
     project: "Dafta v1",
+    date: "2026-08-04",
     createdAt: "2026-08-04T10:00:00.000Z",
     updatedAt: "2026-08-04T10:00:00.000Z",
   },
@@ -60,6 +63,7 @@ const seedEntries: Entry[] = [
     body: "Follow-up engine, smart reminders, daily command center, memory graph.",
     tag: "Product",
     project: "Dafta v1",
+    date: "2026-08-04",
     createdAt: "2026-08-04T11:00:00.000Z",
     updatedAt: "2026-08-04T11:00:00.000Z",
   },
@@ -70,21 +74,32 @@ const seedEntries: Entry[] = [
     body: "Sarah, Amina, Kevin, and the design feedback thread.",
     tag: "People",
     person: "Sarah",
+    date: "2026-08-05",
     createdAt: "2026-08-04T12:00:00.000Z",
     updatedAt: "2026-08-04T12:00:00.000Z",
   },
 ];
 
-const tabs: Tab[] = ["Today", "Inbox", "Notes", "Projects", "Memory"];
+const tabs: Tab[] = ["Today", "Inbox", "Notes", "Calendar", "Projects", "Memory"];
 
-const datePills = [
-  ["Mon", "03"],
-  ["Tue", "04"],
-  ["Wed", "05"],
-  ["Thu", "06"],
-  ["Fri", "07"],
-  ["Sat", "08"],
-];
+const monthStart = new Date("2026-08-01T00:00:00");
+const selectedMonthLabel = "August 2026";
+
+function makeMonthDays() {
+  return Array.from({ length: 31 }, (_, index) => {
+    const date = new Date(monthStart);
+    date.setDate(index + 1);
+
+    return {
+      date,
+      day: date.toLocaleDateString("en-US", { weekday: "short" }),
+      label: String(index + 1).padStart(2, "0"),
+      key: toDateKey(date),
+    };
+  });
+}
+
+const monthDays = makeMonthDays();
 
 function loadEntries() {
   try {
@@ -139,11 +154,23 @@ function titleCase(value: string) {
     .join(" ");
 }
 
+function toDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("Today");
   const [entries, setEntries] = useState<Entry[]>(loadEntries);
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState("2026-08-04");
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
   const [editorDraft, setEditorDraft] = useState<EntryDraft>(makeEmptyDraft());
 
@@ -177,8 +204,16 @@ export default function App() {
 
   const allReminders = entries.filter((entry) => entry.kind === "reminder");
   const allNotes = entries.filter((entry) => entry.kind === "note");
+  const selectedDateEntries = filteredEntries.filter(
+    (entry) => (entry.date ?? "2026-08-04") === selectedDate,
+  );
+  const selectedDateReminders = selectedDateEntries.filter(
+    (entry) => entry.kind === "reminder",
+  );
   const openLoops = allReminders.filter((entry) => !entry.done).length;
-  const nextReminder = allReminders.find((entry) => !entry.done);
+  const nextReminder =
+    selectedDateReminders.find((entry) => !entry.done) ??
+    allReminders.find((entry) => !entry.done);
   const projects = summarizeBy(entries, "project", "No project");
   const people = summarizeBy(entries, "person", "Unassigned");
 
@@ -200,6 +235,7 @@ export default function App() {
       person: parsed.person || undefined,
       project: parsed.project || undefined,
       time: parsed.time || undefined,
+      date: selectedDate,
     };
 
     setEntries((current) => [nextEntry, ...current]);
@@ -231,6 +267,7 @@ export default function App() {
       person: editorDraft.person.trim() || undefined,
       project: editorDraft.project.trim() || undefined,
       updatedAt: new Date().toISOString(),
+      date: selectedEntry.date ?? selectedDate,
     };
 
     setEntries((current) =>
@@ -262,6 +299,12 @@ export default function App() {
     setEntries(seedEntries);
     setSelectedEntry(null);
     setQuery("");
+    setSelectedDate("2026-08-04");
+  }
+
+  function openCalendarForDate(dateKey: string) {
+    setSelectedDate(dateKey);
+    setActiveTab("Calendar");
   }
 
   return (
@@ -320,21 +363,28 @@ export default function App() {
               </div>
             </section>
 
-            <nav className="date-strip" aria-label="Week selector">
-              {datePills.map(([day, date]) => (
+            <nav className="date-strip" aria-label="August date selector">
+              {monthDays.map(({ day, label, key }) => (
                 <button
-                  className={date === "04" ? "date-pill active" : "date-pill"}
-                  key={date}
+                  className={key === selectedDate ? "date-pill active" : "date-pill"}
+                  key={key}
+                  onClick={() => setSelectedDate(key)}
                 >
                   <span>{day}</span>
-                  <strong>{date}</strong>
+                  <strong>{label}</strong>
                 </button>
               ))}
             </nav>
+            <button
+              className="calendar-link"
+              onClick={() => setActiveTab("Calendar")}
+            >
+              View full calendar
+            </button>
 
             <CaptureForm draft={draft} setDraft={setDraft} onSubmit={addEntry} />
             <ReminderList
-              reminders={reminders}
+              reminders={selectedDateReminders}
               openEditor={openEditor}
               toggleDone={toggleDone}
             />
@@ -373,6 +423,65 @@ export default function App() {
                 </button>
               ))}
             </div>
+          </section>
+        )}
+
+        {activeTab === "Calendar" && (
+          <section className="screen-stack">
+            <section className="calendar-hero">
+              <p className="eyebrow">{selectedMonthLabel}</p>
+              <h2>{formatDateLabel(selectedDate)}</h2>
+              <p>
+                {selectedDateEntries.length
+                  ? `${selectedDateEntries.length} saved items for this day.`
+                  : "No notes or reminders for this day yet."}
+              </p>
+            </section>
+
+            <div className="month-grid" aria-label="Full August calendar">
+              {monthDays.map(({ label, key }) => {
+                const dayItems = entries.filter((entry) => entry.date === key);
+                const hasOpenReminder = dayItems.some(
+                  (entry) => entry.kind === "reminder" && !entry.done,
+                );
+
+                return (
+                  <button
+                    className={[
+                      "month-day",
+                      key === selectedDate ? "active" : "",
+                      dayItems.length ? "has-items" : "",
+                    ].join(" ")}
+                    key={key}
+                    onClick={() => openCalendarForDate(key)}
+                  >
+                    <strong>{label}</strong>
+                    {dayItems.length > 0 && <span>{dayItems.length}</span>}
+                    {hasOpenReminder && <i aria-label="Open reminder" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <SectionTitle
+              title="This day"
+              action={`${selectedDateEntries.length} items`}
+            />
+            {selectedDateEntries.map((entry, index) => (
+              <EntryCard
+                entry={entry}
+                key={entry.id}
+                openEditor={openEditor}
+                tone={["yellow", "blue", "violet"][index % 3]}
+                toggleDone={toggleDone}
+              />
+            ))}
+            {!selectedDateEntries.length && (
+              <section className="empty-day">
+                <h3>Clear day</h3>
+                <p>Capture a note or reminder and Dafta will pin it here.</p>
+              </section>
+            )}
           </section>
         )}
 
