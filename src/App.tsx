@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Tab = "Today" | "Inbox" | "Notes" | "Calendar" | "Projects" | "Memory";
 type EntryKind = "note" | "reminder";
+type Priority = "low" | "medium" | "high";
 
 type Entry = {
   id: number;
@@ -16,6 +17,7 @@ type Entry = {
   person?: string;
   project?: string;
   date?: string;
+  priority?: Priority;
 };
 
 type EntryDraft = {
@@ -27,6 +29,7 @@ type EntryDraft = {
   person: string;
   project: string;
   date: string;
+  priority: Priority;
 };
 
 const storageKey = "dafta.entries.v1";
@@ -42,6 +45,7 @@ const seedEntries: Entry[] = [
     person: "Amina",
     project: "Dafta v1",
     date: "2026-08-04",
+    priority: "high",
     createdAt: "2026-08-04T09:00:00.000Z",
     updatedAt: "2026-08-04T09:00:00.000Z",
   },
@@ -54,6 +58,7 @@ const seedEntries: Entry[] = [
     tag: "Design",
     project: "Dafta v1",
     date: "2026-08-04",
+    priority: "medium",
     createdAt: "2026-08-04T10:00:00.000Z",
     updatedAt: "2026-08-04T10:00:00.000Z",
   },
@@ -65,6 +70,7 @@ const seedEntries: Entry[] = [
     tag: "Product",
     project: "Dafta v1",
     date: "2026-08-04",
+    priority: "medium",
     createdAt: "2026-08-04T11:00:00.000Z",
     updatedAt: "2026-08-04T11:00:00.000Z",
   },
@@ -76,6 +82,7 @@ const seedEntries: Entry[] = [
     tag: "People",
     person: "Sarah",
     date: "2026-08-05",
+    priority: "low",
     createdAt: "2026-08-04T12:00:00.000Z",
     updatedAt: "2026-08-04T12:00:00.000Z",
   },
@@ -121,6 +128,7 @@ function makeEmptyDraft(kind: EntryKind = "note"): EntryDraft {
     person: "",
     project: "",
     date: "2026-08-04",
+    priority: "medium",
   };
 }
 
@@ -146,6 +154,7 @@ function parseCapture(text: string): EntryDraft {
     person: personMatch?.[1] ?? "",
     project: projectMatch?.[1] ? titleCase(projectMatch[1]) : "",
     date: "2026-08-04",
+    priority: text.match(/\b(urgent|important|asap|today)\b/i) ? "high" : "medium",
   };
 }
 
@@ -226,6 +235,10 @@ export default function App() {
   const nextReminder =
     selectedDateReminders.find((entry) => !entry.done) ??
     allReminders.find((entry) => !entry.done);
+  const upcomingReminders = allReminders
+    .filter((entry) => !entry.done && (entry.date ?? "2026-08-04") > selectedDate)
+    .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))
+    .slice(0, 3);
   const projects = summarizeBy(entries, "project", "No project");
   const people = summarizeBy(entries, "person", "Unassigned");
 
@@ -255,6 +268,7 @@ export default function App() {
       tag: captureDraft.tag.trim() || parsed.tag,
       person: captureDraft.person.trim() || parsed.person || undefined,
       project: captureDraft.project.trim() || parsed.project || undefined,
+      priority: captureDraft.priority || parsed.priority,
       createdAt: now,
       updatedAt: now,
       date: captureDraft.date || selectedDate,
@@ -293,6 +307,7 @@ export default function App() {
       tag: editorDraft.tag.trim() || (editorDraft.kind === "reminder" ? "Reminder" : "Note"),
       person: editorDraft.person.trim() || undefined,
       project: editorDraft.project.trim() || undefined,
+      priority: editorDraft.priority,
       updatedAt: new Date().toISOString(),
       date: editorDraft.date || selectedEntry.date || selectedDate,
     };
@@ -319,6 +334,26 @@ export default function App() {
           ? { ...entry, done: !entry.done, updatedAt: new Date().toISOString() }
           : entry,
       ),
+    );
+  }
+
+  function snoozeReminder(id: number) {
+    setEntries((current) =>
+      current.map((entry) => {
+        if (entry.id !== id || entry.kind !== "reminder") {
+          return entry;
+        }
+
+        const currentDate = new Date(`${entry.date ?? selectedDate}T00:00:00`);
+        currentDate.setDate(Math.min(currentDate.getDate() + 1, 31));
+
+        return {
+          ...entry,
+          date: toDateKey(currentDate),
+          done: false,
+          updatedAt: new Date().toISOString(),
+        };
+      }),
     );
   }
 
@@ -423,8 +458,18 @@ export default function App() {
             <ReminderList
               reminders={selectedDateReminders}
               openEditor={openEditor}
+              snoozeReminder={snoozeReminder}
               toggleDone={toggleDone}
             />
+            {upcomingReminders.length > 0 && (
+              <ReminderList
+                reminders={upcomingReminders}
+                title="Upcoming"
+                openEditor={openEditor}
+                snoozeReminder={snoozeReminder}
+                toggleDone={toggleDone}
+              />
+            )}
           </>
         )}
 
@@ -446,6 +491,7 @@ export default function App() {
                 entry={entry}
                 key={entry.id}
                 openEditor={openEditor}
+                snoozeReminder={snoozeReminder}
                 tone={["yellow", "blue", "violet"][index % 3]}
                 toggleDone={toggleDone}
               />
@@ -528,6 +574,7 @@ export default function App() {
                 entry={entry}
                 key={entry.id}
                 openEditor={openEditor}
+                snoozeReminder={snoozeReminder}
                 tone={["yellow", "blue", "violet"][index % 3]}
                 toggleDone={toggleDone}
               />
@@ -643,6 +690,7 @@ function entryToDraft(entry: Entry): EntryDraft {
     person: entry.person ?? "",
     project: entry.project ?? "",
     date: entry.date ?? "2026-08-04",
+    priority: entry.priority ?? "medium",
   };
 }
 
@@ -756,6 +804,22 @@ function CaptureForm({
               }
             />
           </label>
+          <label>
+            Priority
+            <select
+              value={entryDraft.priority}
+              onChange={(event) =>
+                setEntryDraft({
+                  ...entryDraft,
+                  priority: event.target.value as Priority,
+                })
+              }
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
           <label className="wide-field">
             Details
             <textarea
@@ -776,21 +840,26 @@ function CaptureForm({
 function ReminderList({
   reminders,
   openEditor,
+  snoozeReminder,
   toggleDone,
+  title = "Reminders",
 }: {
   reminders: Entry[];
   openEditor: (entry: Entry) => void;
+  snoozeReminder: (id: number) => void;
   toggleDone: (id: number) => void;
+  title?: string;
 }) {
   return (
     <section className="content-section">
-      <SectionTitle title="Reminders" action={`${reminders.length} total`} />
+      <SectionTitle title={title} action={`${reminders.length} total`} />
       <div className="reminder-list">
         {reminders.map((entry, index) => (
           <EntryCard
             entry={entry}
             key={entry.id}
             openEditor={openEditor}
+            snoozeReminder={snoozeReminder}
             tone={["yellow", "blue", "violet"][index % 3]}
             toggleDone={toggleDone}
           />
@@ -804,26 +873,38 @@ function EntryCard({
   entry,
   tone = "yellow",
   openEditor,
+  snoozeReminder,
   toggleDone,
 }: {
   entry: Entry;
   tone?: string;
   openEditor: (entry: Entry) => void;
+  snoozeReminder: (id: number) => void;
   toggleDone: (id: number) => void;
 }) {
   return (
-    <article className={`reminder-card ${tone} ${entry.done ? "done" : ""}`}>
+    <article
+      className={`reminder-card ${tone} priority-${entry.priority ?? "medium"} ${
+        entry.done ? "done" : ""
+      }`}
+    >
       <button className="entry-time" onClick={() => openEditor(entry)}>
         {entry.time ?? entry.tag}
       </button>
       <button className="entry-body" onClick={() => openEditor(entry)}>
+        <span className="priority-chip">{entry.priority ?? "medium"}</span>
         <h3>{entry.title}</h3>
-        <p>{entry.body}</p>
+        <p>
+          {entry.body} {entry.date ? `· ${formatDateLabel(entry.date)}` : ""}
+        </p>
       </button>
       {entry.kind === "reminder" && (
-        <button onClick={() => toggleDone(entry.id)}>
-          {entry.done ? "Undo" : "Done"}
-        </button>
+        <div className="entry-actions">
+          <button onClick={() => snoozeReminder(entry.id)}>Snooze</button>
+          <button onClick={() => toggleDone(entry.id)}>
+            {entry.done ? "Undo" : "Done"}
+          </button>
+        </div>
       )}
     </article>
   );
@@ -885,12 +966,41 @@ function EntryEditor({
           </label>
           <div className="editor-grid">
             <label>
+              Date
+              <select
+                value={draft.date}
+                onChange={(event) => onDraftChange({ ...draft, date: event.target.value })}
+              >
+                {monthDays.map(({ day, label, key }) => (
+                  <option key={key} value={key}>
+                    {day} {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
               Time
               <input
                 disabled={draft.kind !== "reminder"}
                 value={draft.time}
                 onChange={(event) => onDraftChange({ ...draft, time: event.target.value })}
               />
+            </label>
+            <label>
+              Priority
+              <select
+                value={draft.priority}
+                onChange={(event) =>
+                  onDraftChange({
+                    ...draft,
+                    priority: event.target.value as Priority,
+                  })
+                }
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
             </label>
             <label>
               Tag

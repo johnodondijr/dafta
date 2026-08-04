@@ -462,6 +462,40 @@ h1 {
   text-align: left;
 }
 
+.priority-chip {
+  background: rgba(17, 19, 24, 0.08);
+  border-radius: 999px;
+  color: rgba(17, 19, 24, 0.68);
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 900;
+  margin-bottom: 6px;
+  padding: 4px 7px;
+  text-transform: uppercase;
+}
+
+.priority-high {
+  border-left: 5px solid var(--coral);
+}
+
+.priority-medium {
+  border-left: 5px solid var(--yellow);
+}
+
+.priority-low {
+  border-left: 5px solid var(--blue);
+}
+
+.entry-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.entry-actions button {
+  font-size: 11px;
+  padding: 9px 10px;
+}
+
 .reminder-card div,
 .person-row div {
   flex: 1;
