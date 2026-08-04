@@ -49,6 +49,14 @@ fast, beautiful, intelligent, and trustworthy.
 - AI should reduce mental load quietly.
 - The app should be beautiful enough to love and simple enough to keep using.
 
+## Design Direction
+
+Dafta is mobile-first, warm, tactile, and premium. The visual language uses a
+paper-like canvas, bold typography, rounded cards, colorful but restrained
+accent surfaces, pill controls, and a dark floating bottom navigation.
+
+See `docs/design-direction.md` for the evolving UI direction.
+
 ## Initial Roadmap
 
 1. Define brand, UI direction, and interaction model.
